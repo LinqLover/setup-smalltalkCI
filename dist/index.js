@@ -95,7 +95,7 @@ async function run() {
       /* Find and export smalltalkCI's env vars. */
       envList = child_process.execSync('smalltalkci --print-env').toString()
     } else {
-      envList = child_process.execSync(`bash -l -c "${installationDirectory}/bin/smalltalkci --print-env"`).toString()
+      envList = child_process.execSync('bash -l -c "smalltalkci --print-env"').toString()
     }
     for (const envItem of envList.split('\n')) {
       const parts = envItem.split('=')
