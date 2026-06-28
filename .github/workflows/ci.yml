@@ -59,7 +59,7 @@ jobs:
                   | ignored | index($basename) | not
                 )
               )
-            ' "$RUNNER_TEMP/elf-deps.json"
+            ' "${{ runner.temp }}/elf-deps.json"
           )"
 
           echo "$filtered"
