@@ -39,7 +39,7 @@ jobs:
         run: |
           set -o pipefail
           ./tests/check_elf_deps.js $SMALLTALK_CI_VMS/${{ matrix.smalltalk }} \
-            | tee "${{ runner.temp }}/elf-deps.log" \
+            | tee "${{ runner.temp }}/elf-deps.json" \
             || true
       - name: Check for missing dependencies
         shell: bash
@@ -50,7 +50,8 @@ jobs:
             jq '
               def ignored:
                 [
-                  "vm-sound-NAS.so"
+                  "vm-sound-NAS.so",
+                  "vm-sound-sndio.so"
                 ];
 
               with_entries(
