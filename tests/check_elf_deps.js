@@ -2,7 +2,7 @@
 
 import { spawnSync } from 'node:child_process'
 import { readdirSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 
 function walk(dir) {
   const out = []
@@ -24,9 +24,17 @@ const files = walk(root).filter(
 const missingLibraries = {}
 
 for (const file of files) {
+  const env = {
+    ...process.env,
+    LD_LIBRARY_PATH: [dirname(file), process.env.LD_LIBRARY_PATH || '']
+      .filter(Boolean)
+      .join(':')
+  }
+
   const result = spawnSync('ldd', [file], {
     encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe']
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env
   })
 
   const output = `${result.stdout || ''}\n${result.stderr || ''}`
@@ -41,7 +49,7 @@ for (const file of files) {
 }
 
 if (Object.keys(missingLibraries).length > 0) {
-  console.error('Missing shared libraries:')
+  console.error('Missing shared libraries!')
   console.log(JSON.stringify(missingLibraries, null, 2))
   process.exit(1)
 }

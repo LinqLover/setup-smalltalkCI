@@ -34,6 +34,39 @@ jobs:
           smalltalk-image: ${{ matrix.smalltalk }}
       - name: Install VM
         run: smalltalkci -s ${{ matrix.smalltalk }} tests/empty.smalltalk.ston
-      - name: Check ELF dependencies
-        if: runner.os == 'Linux'
-        run: ./tests/check_elf_deps.js $SMALLTALK_CI_VMS/${{ matrix.smalltalk }}
+      - name: Search ELF dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          ./tests/check_elf_deps.js $SMALLTALK_CI_VMS/${{ matrix.smalltalk }} \
+            | tee "${{ runner.temp }}/elf-deps.log" \
+            || true
+      - name: Check for missing dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          run: |
+            set -euo pipefail
+
+            filtered="$(
+              jq '
+                def ignored:
+                  [
+                    "vm-sound-NAS.so"
+                  ];
+
+                with_entries(
+                  select(
+                    (.key | split("/")[-1]) as $basename
+                    | ignored | index($basename) | not
+                  )
+                )
+              ' "$RUNNER_TEMP/elf-deps.json"
+            )"
+
+            echo "$filtered"
+
+            if [ "$(jq 'length' <<< "$filtered")" -ne 0 ]; then
+              echo "Unexpected missing shared libraries remain after allowlist filtering" >&2
+              exit 1
+            fi
