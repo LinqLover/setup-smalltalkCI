@@ -1,12 +1,12 @@
-const child_process = require('child_process')
-const fs = require('fs')
-const os = require('os')
-const path = require('path')
+import * as child_process from 'child_process'
+import * as fs from 'fs'
+import * as os from 'os'
+import * as path from 'path'
 
-const core = require('@actions/core')
-const exec = require('@actions/exec')
-const io = require('@actions/io')
-const tc = require('@actions/tool-cache')
+import * as core from '@actions/core'
+import * as exec from '@actions/exec'
+import * as io from '@actions/io'
+import * as tc from '@actions/tool-cache'
 
 const IS_LINUX = process.platform === 'linux'
 const IS_WINDOWS = process.platform === 'win32'
@@ -15,18 +15,20 @@ const DEFAULT_WORKSPACE = os.homedir()
 const DEFAULT_BRANCH = 'master'
 const DEFAULT_SOURCE = 'hpi-swa/smalltalkCI'
 const LSB_FILE = '/etc/lsb-release'
+const UBUNTU_VERSION = getUbuntuVersion()
 const DEFAULT_64BIT_DEPS = 'libpulse0'
-const DEFAULT_32BIT_DEPS = 'libc6-i386 libuuid1:i386 ' + (isUbuntu18() ? 'libssl1.0.0:i386' : 'libssl1.1:i386')
+const DEFAULT_32BIT_DEPS = `libc6-i386 libuuid1:i386${UBUNTU_VERSION == 18 ? ' libssl1.0.0:i386' : UBUNTU_VERSION == 20 ? ' libssl1.1:i386' : ''}`
 const PHARO_32BIT_DEPS = `${DEFAULT_32BIT_DEPS} libcairo2:i386`
 
-
-async function run() {
+export async function run() {
   try {
     let image
     const version = core.getInput('smalltalk-version')
     if (version.length > 0) {
       image = version
-      core.warning('Please use "smalltalk-image". "smalltalk-version" is deprecated and will be removed in the future.')
+      core.warning(
+        'Please use "smalltalk-image". "smalltalk-version" is deprecated and will be removed in the future.'
+      )
     } else {
       image = core.getInput('smalltalk-image', { required: true })
     }
@@ -36,32 +38,53 @@ async function run() {
     const isEtoys = isPlatform(image, 'etoys')
     const isPharo = isPlatform(image, 'pharo')
     const isMoose = isPlatform(image, 'moose')
+    const isGToolkit = isPlatform(image, 'gtoolkit')
     const isGemstone = isPlatform(image, 'gemstone')
 
-    if (!isSqueak && !isEtoys && !isPharo && !isMoose && !isGemstone) {
+    if (
+      !isSqueak &&
+      !isEtoys &&
+      !isPharo &&
+      !isMoose &&
+      !isGToolkit &&
+      !isGemstone
+    ) {
       return core.setFailed(`Unsupported Smalltalk version "${image}".`)
     }
 
     core.setOutput('smalltalk-image', image)
     core.setOutput('smalltalk-version', version)
 
-    const smalltalkCIWorkspace = core.getInput('smalltalkCI-workspace') || DEFAULT_WORKSPACE
-    const smalltalkCIBranch = core.getInput('smalltalkCI-branch') || DEFAULT_BRANCH
-    const smalltalkCISource = core.getInput('smalltalkCI-source') || DEFAULT_SOURCE
+    const smalltalkCIWorkspace =
+      core.getInput('smalltalkCI-workspace') || DEFAULT_WORKSPACE
+    const smalltalkCIBranch =
+      core.getInput('smalltalkCI-branch') || DEFAULT_BRANCH
+    const smalltalkCISource =
+      core.getInput('smalltalkCI-source') || DEFAULT_SOURCE
 
-    const installationDirectory = path.join(smalltalkCIWorkspace, '.smalltalkCI')
+    const installationDirectory = path.join(
+      smalltalkCIWorkspace,
+      '.smalltalkCI'
+    )
     let tempDirectory = path.join(smalltalkCIWorkspace, '.smalltalkCI-temp')
 
     /* Download and extract smalltalkCI. */
     console.log('Downloading and extracting smalltalkCI...')
     if (IS_WINDOWS) {
-      const toolPath = await tc.downloadTool(`https://github.com/${smalltalkCISource}/archive/${smalltalkCIBranch}.zip`)
+      const toolPath = await tc.downloadTool(
+        `https://github.com/${smalltalkCISource}/archive/${smalltalkCIBranch}.zip`
+      )
       tempDirectory = await tc.extractZip(toolPath, tempDirectory)
     } else {
-      const toolPath = await tc.downloadTool(`https://github.com/${smalltalkCISource}/archive/${smalltalkCIBranch}.tar.gz`)
+      const toolPath = await tc.downloadTool(
+        `https://github.com/${smalltalkCISource}/archive/${smalltalkCIBranch}.tar.gz`
+      )
       tempDirectory = await tc.extractTar(toolPath, tempDirectory)
     }
-    await io.mv(path.join(tempDirectory, `smalltalkCI-${smalltalkCIBranch}`), installationDirectory)
+    await io.mv(
+      path.join(tempDirectory, `smalltalkCI-${smalltalkCIBranch}`),
+      installationDirectory
+    )
 
     /* Install dependencies if any. */
     if (IS_LINUX) {
@@ -72,7 +95,7 @@ async function run() {
       } else {
         if (isSqueak || isEtoys) {
           await install32bitDependencies(DEFAULT_32BIT_DEPS)
-        } else if (isPharo || isMoose) {
+        } else if (isPharo || isMoose || isGToolkit) {
           await install32bitDependencies(PHARO_32BIT_DEPS)
         } else if (isGemstone) {
           // nothing to, smalltalkCI will set up the system using GsDevKit_home
@@ -88,7 +111,9 @@ async function run() {
       /* Find and export smalltalkCI's env vars. */
       envList = child_process.execSync('smalltalkci --print-env').toString()
     } else {
-      envList = child_process.execSync('bash -l -c "smalltalkci --print-env"').toString()
+      envList = child_process
+        .execSync('bash -l -c "smalltalkci --print-env"')
+        .toString()
     }
     for (const envItem of envList.split('\n')) {
       const parts = envItem.split('=')
@@ -112,17 +137,23 @@ async function install32bitDependencies(deps) {
   await exec.exec(`sudo apt-get install -qq --no-install-recommends ${deps}`)
 }
 
-function isUbuntu18() {
+function getUbuntuVersion() {
   if (IS_LINUX && fs.existsSync(LSB_FILE)) {
-    return fs.readFileSync(LSB_FILE).toString().includes('DISTRIB_RELEASE=18')
+    const contents = fs.readFileSync(LSB_FILE).toString()
+    if (contents.includes('DISTRIB_RELEASE=22')) {
+      return 22
+    } else if (contents.includes('DISTRIB_RELEASE=20')) {
+      return 20
+    } else if (contents.includes('DISTRIB_RELEASE=18')) {
+      return 18
+    } else {
+      return -1
+    }
   } else {
-    return false
+    return -1
   }
 }
 
 function isPlatform(image, name) {
   return image.toLowerCase().startsWith(name)
 }
-
-// eslint-disable-next-line no-floating-promise/no-floating-promise
-run()  // return a Promise as specified by the GitHub Actions protocol
