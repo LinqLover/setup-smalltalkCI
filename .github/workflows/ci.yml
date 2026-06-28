@@ -36,4 +36,4 @@ jobs:
         run: smalltalkci -s ${{ matrix.smalltalk }} tests/empty.smalltalk.ston
       - name: Check ELF dependencies
         if: runner.os == 'Linux'
-        run: ./test/check_elf_deps.js $SMALLTALK_CI_VMS/${{ matrix.smalltalk }}
+        run: ./tests/check_elf_deps.js $SMALLTALK_CI_VMS/${{ matrix.smalltalk }}
