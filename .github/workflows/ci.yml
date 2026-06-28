@@ -20,3 +20,20 @@ jobs:
       - shell: bash
         if: runner.os == 'Windows'
         run: smalltalkci --help
+
+  test-vm-installation:
+    strategy:
+      matrix:
+        smalltalk: [Squeak64-6.0, Squeak-6.0]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: ./
+        with:
+          smalltalk-image: ${{ matrix.smalltalk }}
+      - name: Install VM
+        run: smalltalkci -s ${{ matrix.smalltalk }} tests/empty.smalltalk.ston
+      - name: Check ELF dependencies
+        if: runner.os == 'Linux'
+        run: ./test/check_elf_deps.js $SMALLTALK_CI_VMS/${{ matrix.smalltalk }}
