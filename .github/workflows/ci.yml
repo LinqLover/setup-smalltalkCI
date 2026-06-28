@@ -45,28 +45,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          run: |
-            set -euo pipefail
 
-            filtered="$(
-              jq '
-                def ignored:
-                  [
-                    "vm-sound-NAS.so"
-                  ];
+          filtered="$(
+            jq '
+              def ignored:
+                [
+                  "vm-sound-NAS.so"
+                ];
 
-                with_entries(
-                  select(
-                    (.key | split("/")[-1]) as $basename
-                    | ignored | index($basename) | not
-                  )
+              with_entries(
+                select(
+                  (.key | split("/")[-1]) as $basename
+                  | ignored | index($basename) | not
                 )
-              ' "$RUNNER_TEMP/elf-deps.json"
-            )"
+              )
+            ' "$RUNNER_TEMP/elf-deps.json"
+          )"
 
-            echo "$filtered"
+          echo "$filtered"
 
-            if [ "$(jq 'length' <<< "$filtered")" -ne 0 ]; then
-              echo "Unexpected missing shared libraries remain after allowlist filtering" >&2
-              exit 1
-            fi
+          if [ "$(jq 'length' <<< "$filtered")" -ne 0 ]; then
+            echo "Unexpected missing shared libraries remain after allowlist filtering" >&2
+            exit 1
+          fi
